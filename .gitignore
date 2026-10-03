@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+.env
+.next/
+out/
+*.log
+frontend/compile_errors.txt
+.vscode/
+.idea/
+.DS_Store

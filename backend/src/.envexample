@@ -1,0 +1,10 @@
+DATABASE_URL=postgresql://user:password@localhost:5432/delivery_tracker
+JWT_SECRET=your-super-secret-jwt-key-change-this
+JWT_EXPIRES_IN=7d
+PORT=3000
+FRONTEND_URL=http://localhost:5173
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_USER=resend
+SMTP_PASS=your-resend-api-key
+SMTP_FROM=onboarding@resend.dev

@@ -1,0 +1,10 @@
+```gitattributes
+# Treat TypeScript files as JavaScript
+*.ts linguist-language=JavaScript
+*.tsx linguist-language=JavaScript
+
+# Ignore generated/build files
+dist/** linguist-generated=true
+build/** linguist-generated=true
+node_modules/** linguist-vendored
+```

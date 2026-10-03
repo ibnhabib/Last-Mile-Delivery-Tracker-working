@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  AGENT
+  ADMIN
+}
+
+enum AgentStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum OrderType {
+  B2B
+  B2C
+}
+
+enum ZoneType {
+  INTRA_ZONE
+  INTER_ZONE
+}
+
+enum PaymentType {
+  PREPAID
+  COD
+}
+
+enum OrderStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  role         Role     @default(CUSTOMER)
+  isVerified   Boolean  @default(false) @map("is_verified")
+  otpCode      String?  @map("otp_code")
+  otpExpiresAt DateTime? @map("otp_expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  deliveryAgent    DeliveryAgent?
+  customerOrders   Order[]           @relation("CustomerOrders")
+  createdOrders    Order[]           @relation("CreatedByOrders")
+  trackingChanges  TrackingHistory[] @relation("ChangedByUser")
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+model Zone {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  areas          Area[]
+  agents         DeliveryAgent[]
+  pickupOrders   Order[]         @relation("PickupZoneOrders")
+  dropOrders     Order[]         @relation("DropZoneOrders")
+
+  @@map("zones")
+}
+
+model Area {
+  id        String   @id @default(uuid())
+  name      String
+  pincode   String
+  zoneId    String   @map("zone_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([name, pincode])
+  @@map("areas")
+}
+
+model RateCard {
+  id            String   @id @default(uuid())
+  orderType     OrderType @map("order_type")
+  zoneType      ZoneType  @map("zone_type")
+  baseRate      Decimal   @map("base_rate") @db.Decimal(10, 2)
+  perKgRate     Decimal   @map("per_kg_rate") @db.Decimal(10, 2)
+  codSurcharge  Decimal   @default(0) @map("cod_surcharge") @db.Decimal(10, 2)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([orderType, zoneType])
+  @@map("rate_cards")
+}
+
+model DeliveryAgent {
+  id          String      @id @default(uuid())
+  userId      String      @unique @map("user_id")
+  zoneId      String?     @map("zone_id")
+  status      AgentStatus @default(AVAILABLE)
+  currentArea String?     @map("current_area")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  orders Order[]
+
+  @@map("delivery_agents")
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  trackingId       String      @unique @map("tracking_id")
+  customerId       String      @map("customer_id")
+  agentId          String?     @map("agent_id")
+  pickupAddress    String      @map("pickup_address")
+  pickupArea       String      @map("pickup_area")
+  pickupPincode    String      @map("pickup_pincode")
+  dropAddress      String      @map("drop_address")
+  dropArea         String      @map("drop_area")
+  dropPincode      String      @map("drop_pincode")
+  packageLength    Decimal     @map("package_length") @db.Decimal(10, 2)
+  packageBreadth   Decimal     @map("package_breadth") @db.Decimal(10, 2)
+  packageHeight    Decimal     @map("package_height") @db.Decimal(10, 2)
+  actualWeight     Decimal     @map("actual_weight") @db.Decimal(10, 2)
+  volumetricWeight Decimal     @map("volumetric_weight") @db.Decimal(10, 2)
+  billableWeight   Decimal     @map("billable_weight") @db.Decimal(10, 2)
+  orderType        OrderType   @map("order_type")
+  paymentType      PaymentType @map("payment_type")
+  baseCharge       Decimal     @map("base_charge") @db.Decimal(10, 2)
+  weightCharge     Decimal     @map("weight_charge") @db.Decimal(10, 2)
+  codSurcharge     Decimal     @map("cod_surcharge") @db.Decimal(10, 2)
+  totalCharge      Decimal     @map("total_charge") @db.Decimal(10, 2)
+  status           OrderStatus @default(PENDING)
+  pickupZoneId     String      @map("pickup_zone_id")
+  dropZoneId       String      @map("drop_zone_id")
+  scheduledDate    DateTime?   @map("scheduled_date")
+  attemptCount     Int         @default(1) @map("attempt_count")
+  createdBy        String      @map("created_by")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  customer        User              @relation("CustomerOrders", fields: [customerId], references: [id])
+  agent           DeliveryAgent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  pickupZone      Zone              @relation("PickupZoneOrders", fields: [pickupZoneId], references: [id])
+  dropZone        Zone              @relation("DropZoneOrders", fields: [dropZoneId], references: [id])
+  creator         User              @relation("CreatedByOrders", fields: [createdBy], references: [id])
+  trackingHistory TrackingHistory[]
+  notifications   Notification[]
+
+  @@map("orders")
+}
+
+model TrackingHistory {
+  id        String      @id @default(uuid())
+  orderId   String      @map("order_id")
+  status    OrderStatus
+  notes     String?
+  changedBy String      @map("changed_by")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  // Relations — append-only / immutable by convention
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation("ChangedByUser", fields: [changedBy], references: [id])
+
+  @@map("tracking_history")
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  orderId   String             @map("order_id")
+  userId    String             @map("user_id")
+  type      NotificationType
+  subject   String
+  content   String
+  status    NotificationStatus @default(PENDING)
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
